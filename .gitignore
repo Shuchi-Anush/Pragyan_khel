@@ -1,3 +1,9 @@
+venv/
+__pycache__/
+*.pyc
+ps2/sample_videos/
+ps2/results/
+
 # Gradle files
 .gradle/
 build/
