@@ -1,3 +1,8 @@
+ps2/dataset/
+ps2/models/
+ps2/scripts.zip
+*.pt
+*.zip
 venv/
 __pycache__/
 *.pyc
