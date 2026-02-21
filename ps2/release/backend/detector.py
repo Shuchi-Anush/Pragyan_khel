@@ -286,13 +286,15 @@ def process_video(video_path: str, model_path: str = "best.pt", cfg: dict = None
     frame_to_ball = {b["frame"]: b for b in ball_history}
 
     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-    # Prefer H.264 (avc1) for browser-compatible playback; fall back to mp4v
-    fourcc = cv2.VideoWriter_fourcc(*"avc1")
-    out   = cv2.VideoWriter(annotated_path, fourcc, fps, (frame_w, frame_h))
-    if not out.isOpened():
-        print("[detector] avc1 encoder unavailable, falling back to mp4v")
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        out    = cv2.VideoWriter(annotated_path, fourcc, fps, (frame_w, frame_h))
+    # Try multiple H.264 codecs for browser compatibility
+    for codec_name in ["avc1", "H264", "X264", "mp4v"]:
+        fourcc = cv2.VideoWriter_fourcc(*codec_name)
+        out = cv2.VideoWriter(annotated_path, fourcc, fps, (frame_w, frame_h))
+        if out.isOpened():
+            print(f"[detector] Using {codec_name} codec")
+            break
+    else:
+        raise RuntimeError("No suitable video codec found")
 
     fid = 0
     print("[detector] Pass 2 — Rendering annotated video ...")
@@ -398,14 +400,24 @@ def process_video(video_path: str, model_path: str = "best.pt", cfg: dict = None
         for fr in frame_reports:
             f.write(f"{fr['frame']},{fr['label']},{fr['center'][0]},{fr['center'][1]},{fr['conf']},{fr['predicted']}\n")
 
+    # Generate thumbnail from first frame
+    thumbnail_path = os.path.join(output_dir, f"{basename}_thumbnail.jpg")
+    cap_thumb = cv2.VideoCapture(annotated_path)
+    ret, first_frame = cap_thumb.read()
+    if ret:
+        cv2.imwrite(thumbnail_path, first_frame)
+    cap_thumb.release()
+
     print(f"[detector] Output:  {annotated_path}")
     print(f"[detector] Report:  {report_path}")
     print(f"[detector] CSV:     {csv_path}")
+    print(f"[detector] Thumbnail: {thumbnail_path}")
 
     return {
         "annotated_video": os.path.basename(annotated_path),
         "report":          summary,
         "report_file":     os.path.basename(report_path),
         "csv_file":        os.path.basename(csv_path),
+        "thumbnail":       os.path.basename(thumbnail_path),
     }
 

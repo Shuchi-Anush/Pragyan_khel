@@ -7,6 +7,14 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ScatterChart,
+  Scatter,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ReferenceLine,
+  BarChart,
+  Bar,
 } from "recharts";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -32,16 +40,31 @@ function generatePDF(data, videoFile) {
   const fps = data.fps || 25;
   const W = doc.internal.pageSize.getWidth();
   const now = new Date();
-  const generatedAt = now.toLocaleString("en-IN", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    timeZoneName: "short",
-  });
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const generatedAt = `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}  ${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())} (local)`;
   const reportId = `RPT-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
   const normalFrames = Math.max(
     0,
@@ -53,8 +76,8 @@ function generatePDF(data, videoFile) {
       : "0.00";
   const verdict =
     summary.drop_frames === 0 && summary.merge_frames === 0
-      ? "CLEAN — No temporal artefacts detected."
-      : `ARTEFACTS FOUND — ${summary.drop_frames} drop(s), ${summary.merge_frames} merge(s) require review.`;
+      ? "CLEAN - No temporal artefacts detected."
+      : `ARTEFACTS FOUND - ${summary.drop_frames} drop(s), ${summary.merge_frames} merge(s) require review.`;
 
   // ── colour palette
   const GREEN = [16, 185, 129];
@@ -117,9 +140,9 @@ function generatePDF(data, videoFile) {
     alternateRowStyles: { fillColor: [248, 250, 252] },
     head: [["Field", "Value"]],
     body: [
-      ["Source File", data.source ?? "—"],
+      ["Source File", data.source ?? "-"],
       ["Frame Rate", `${fps.toFixed(3)} FPS`],
-      ["Resolution", data.resolution ?? "—"],
+      ["Resolution", data.resolution ?? "-"],
       ["Total Frames", String(summary.total_frames)],
       ["Total Duration", frameToTimestamp(summary.total_frames, fps)],
     ],
@@ -234,7 +257,7 @@ function generatePDF(data, videoFile) {
 
   // ── Helper: describe ball region of frame
   const frameZone = (cx, cy, res) => {
-    if (!cx || !cy || !res) return "—";
+    if (!cx || !cy || !res) return "-";
     const [rw, rh] = res.split("x").map(Number);
     if (!rw || !rh) return `(${cx}, ${cy})`;
     const hZone = cx < rw * 0.33 ? "Left" : cx < rw * 0.66 ? "Center" : "Right";
@@ -273,7 +296,7 @@ function generatePDF(data, videoFile) {
     doc.setFont("helvetica", "italic");
     doc.setFontSize(9);
     doc.setTextColor(...GREEN);
-    doc.text("✓  No incidents detected in this footage.", 18, y);
+    doc.text("No incidents detected in this footage.", 18, y);
     y += 10;
   } else {
     const incidentRows = allIncidents.map((inc, i) => {
@@ -288,7 +311,7 @@ function generatePDF(data, videoFile) {
       const li = frameMap[last];
       const startPos = fi
         ? frameZone(fi.center?.[0], fi.center?.[1], data.resolution)
-        : "—";
+        : "-";
       const endPos =
         dur > 1 && li
           ? frameZone(li.center?.[0], li.center?.[1], data.resolution)
@@ -301,14 +324,14 @@ function generatePDF(data, videoFile) {
       const overlap =
         alsoMerged || alsoDropped
           ? inc.type === "DROP"
-            ? "⚠ Also MERGE"
-            : "⚠ Also DROP"
-          : "—";
+            ? "[!] Also MERGE"
+            : "[!] Also DROP"
+          : "-";
       return [
         String(i + 1),
         inc.type,
-        dur > 1 ? `${first} – ${last}` : String(first),
-        dur > 1 ? `${tsStart} → ${tsEnd}` : tsStart,
+        dur > 1 ? `${first} - ${last}` : String(first),
+        dur > 1 ? `${tsStart} -> ${tsEnd}` : tsStart,
         dur > 1 ? `${dur} frames (${durSec}s)` : "1 frame",
         startPos,
         overlap,
@@ -348,7 +371,7 @@ function generatePDF(data, videoFile) {
         if (hk.column.index === 1) {
           hk.cell.styles.textColor = type === "DROP" ? RED : AMBER;
         }
-        if (hk.column.index === 6 && hk.cell.raw !== "—") {
+        if (hk.column.index === 6 && hk.cell.raw !== "-") {
           hk.cell.styles.textColor = [239, 68, 68];
           hk.cell.styles.fontStyle = "bold";
         }
@@ -367,19 +390,19 @@ function generatePDF(data, videoFile) {
     doc.setFont("helvetica", "italic");
     doc.setFontSize(9);
     doc.setTextColor(...GREEN);
-    doc.text("✓  No drop frames detected in this footage.", 18, y);
+    doc.text("No drop frames detected in this footage.", 18, y);
     y += 10;
   } else {
     const dropRows = summary.drop_frame_list.map((f, i) => {
       const ts = frameToTimestamp(f, fps);
       const reasons =
-        (summary.drop_reasons?.[String(f)] || []).join(", ") || "—";
+        (summary.drop_reasons?.[String(f)] || []).join(", ") || "-";
       const fi = frameMap[f];
-      const cx = fi?.center?.[0] ?? "—";
-      const cy = fi?.center?.[1] ?? "—";
-      const conf = fi?.conf != null ? fi.conf.toFixed(3) : "—";
+      const cx = fi?.center?.[0] ?? "-";
+      const cy = fi?.center?.[1] ?? "-";
+      const conf = fi?.conf != null ? fi.conf.toFixed(3) : "-";
       const pred = fi?.predicted ? "Yes (estimated)" : "No (detected)";
-      const alsoMerge = mergeSet.has(f) ? "YES ⚠" : "No";
+      const alsoMerge = mergeSet.has(f) ? "YES (!)" : "No";
       return [
         String(i + 1),
         String(f),
@@ -425,7 +448,7 @@ function generatePDF(data, videoFile) {
       didParseCell(hk) {
         if (hk.section !== "body") return;
         // Highlight "Also Merge?" YES cells
-        if (hk.column.index === 7 && hk.cell.raw === "YES ⚠") {
+        if (hk.column.index === 7 && hk.cell.raw === "YES (!)") {
           hk.cell.styles.textColor = AMBER;
           hk.cell.styles.fontStyle = "bold";
         }
@@ -448,22 +471,22 @@ function generatePDF(data, videoFile) {
     doc.setFont("helvetica", "italic");
     doc.setFontSize(9);
     doc.setTextColor(...GREEN);
-    doc.text("✓  No merge frames detected in this footage.", 18, y);
+    doc.text("No merge frames detected in this footage.", 18, y);
     y += 10;
   } else {
     const mergeRows = summary.merge_frame_list.map((f, i) => {
       const ts = frameToTimestamp(f, fps);
       const fi = frameMap[f];
-      const cx = fi?.center?.[0] ?? "—";
-      const cy = fi?.center?.[1] ?? "—";
+      const cx = fi?.center?.[0] ?? "-";
+      const cy = fi?.center?.[1] ?? "-";
       const zone = frameZone(fi?.center?.[0], fi?.center?.[1], data.resolution);
-      const conf = fi?.conf != null ? fi.conf.toFixed(3) : "—";
+      const conf = fi?.conf != null ? fi.conf.toFixed(3) : "-";
       // Derive which merge criterion triggered
       const isLowConf = fi?.conf != null && fi.conf < 0.4;
       const reason = isLowConf
         ? `Low confidence (${conf} < 0.40)`
         : "SSIM similarity high + low blur vs neighbours";
-      const alsoDropped = dropSet.has(f) ? "YES ⚠" : "No";
+      const alsoDropped = dropSet.has(f) ? "YES (!)" : "No";
       return [
         String(i + 1),
         String(f),
@@ -508,7 +531,7 @@ function generatePDF(data, videoFile) {
       },
       didParseCell(hk) {
         if (hk.section !== "body") return;
-        if (hk.column.index === 7 && hk.cell.raw === "YES ⚠") {
+        if (hk.column.index === 7 && hk.cell.raw === "YES (!)") {
           hk.cell.styles.textColor = RED;
           hk.cell.styles.fontStyle = "bold";
         }
@@ -535,11 +558,11 @@ function generatePDF(data, videoFile) {
     ["Tracking Algorithm", "OpenCV Kalman Filter (4-state: x, y, vx, vy)"],
     [
       "ROI Strategy",
-      `Search window ±200 px around Kalman prediction; fallback to full-frame`,
+      "Search window +/-200 px around Kalman prediction; fallback to full-frame",
     ],
     [
       "Drop Criterion",
-      "Frame flagged when: detection absent (NO_DET), outside gate threshold (GATE), or frame gap ≥ 2 (GAP)",
+      "Frame flagged when: detection absent (NO_DET), outside gate threshold (GATE), or frame gap >= 2 (GAP)",
     ],
     [
       "Merge Criterion",
@@ -547,11 +570,11 @@ function generatePDF(data, videoFile) {
     ],
     [
       "Confidence Threshold",
-      "YOLO confidence ≥ 0.15 (low threshold for maximum recall)",
+      "YOLO confidence >= 0.15 (low threshold for maximum recall)",
     ],
     [
       "Output Video Codec",
-      "H.264 (avc1) MP4 — annotated with trajectory, event labels, and frame counter",
+      "H.264 (avc1) MP4 - annotated with trajectory, event labels, and frame counter",
     ],
   ];
 
@@ -639,13 +662,13 @@ export default function Results() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [speed, setSpeed] = useState(1);
   const [pdfLoading, setPdfLoading] = useState(false);
   const videoRef = useRef(null);
 
   const videoFile = searchParams.get("video");
   const reportFile = searchParams.get("report");
   const csvFile = searchParams.get("csv");
+  const thumbnail = searchParams.get("thumbnail");
 
   useEffect(() => {
     if (!reportFile) {
@@ -667,12 +690,6 @@ export default function Results() {
         setError(true);
       });
   }, [reportFile]);
-
-  const handleSpeedChange = (e) => {
-    const s = parseFloat(e.target.value);
-    setSpeed(s);
-    if (videoRef.current) videoRef.current.playbackRate = s;
-  };
 
   /* ── Loading / error states ── */
   if (loading) {
@@ -719,6 +736,35 @@ export default function Results() {
     summary.tracked_positions > 0
       ? ((normalFrames / summary.total_frames) * 100).toFixed(1)
       : 0;
+
+  /* ── Analytical chart data ─────────────────────────────────────────── */
+  const GATE_THRESHOLD = 80;
+
+  // Timeline: three scatter series, y = 0/1/2 per class
+  const timelineNormal = (data.frames || [])
+    .filter((f) => f.label === "NORMAL")
+    .map((f) => ({ x: f.frame, y: 0 }));
+  const timelineDrop = (data.frames || [])
+    .filter((f) => f.label === "DROP")
+    .map((f) => ({ x: f.frame, y: 1 }));
+  const timelineMerge = (data.frames || [])
+    .filter((f) => f.label === "MERGE")
+    .map((f) => ({ x: f.frame, y: 2 }));
+
+  // Motion error: GATE(Xpx) value if present, otherwise Euclidean centre delta
+  const motionData = (data.frames || []).map((f, i) => {
+    const gateReason = f.reasons?.find((r) => r.startsWith("GATE("));
+    let error = 0;
+    if (gateReason) {
+      error = parseInt(gateReason.match(/GATE\((\d+)px\)/)?.[1] || "0", 10);
+    } else if (i > 0) {
+      const prev = data.frames[i - 1];
+      const dx = (f.center?.[0] ?? 0) - (prev.center?.[0] ?? 0);
+      const dy = (f.center?.[1] ?? 0) - (prev.center?.[1] ?? 0);
+      error = Math.round(Math.sqrt(dx * dx + dy * dy));
+    }
+    return { frame: f.frame, error, label: f.label };
+  });
 
   return (
     <div className="min-h-screen bg-slate-950 font-sans pb-16">
@@ -830,42 +876,15 @@ export default function Results() {
           <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5">
             <h2 className="text-white font-semibold mb-3 flex items-center gap-2">
               <span className="w-2 h-2 bg-emerald-400 rounded-full" />
-              Annotated Video
+              Video Preview
             </h2>
-            <video
-              ref={videoRef}
-              controls
-              src={`/video/${videoFile}`}
-              className="w-full rounded-xl bg-black"
-              style={{ maxHeight: "420px" }}
-            />
-            {/* Speed control */}
-            <div className="flex items-center gap-3 mt-4">
-              <span className="text-slate-400 text-sm w-24">
-                Speed:{" "}
-                <span className="text-emerald-400 font-semibold">{speed}×</span>
-              </span>
-              <input
-                type="range"
-                min="0.25"
-                max="2"
-                step="0.25"
-                value={speed}
-                onChange={handleSpeedChange}
-                className="flex-1 accent-emerald-500 max-w-48"
+            <div className="relative bg-black rounded-xl overflow-hidden">
+              <img 
+                src={`/download/${thumbnail}`} 
+                alt="First frame" 
+                className="w-full rounded-xl"
+                style={{ maxHeight: "420px", objectFit: "contain" }}
               />
-              {[0.5, 1, 1.5, 2].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => {
-                    setSpeed(s);
-                    if (videoRef.current) videoRef.current.playbackRate = s;
-                  }}
-                  className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${speed === s ? "bg-emerald-600 text-white" : "bg-slate-800 text-slate-400 hover:text-white"}`}
-                >
-                  {s}×
-                </button>
-              ))}
             </div>
           </div>
 
@@ -957,6 +976,210 @@ export default function Results() {
             </div>
           </div>
         </div>
+
+        {/* ── Analytical Charts ── */}
+        {data.frames && data.frames.length > 0 && (
+          <div className="space-y-6">
+            {/* 1 — Timeline Classification Graph */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+              <h2 className="text-white font-semibold mb-1 flex items-center gap-2">
+                <span className="w-2 h-2 bg-violet-400 rounded-full" />
+                Frame Classification Timeline
+                <span className="ml-auto text-slate-500 text-xs font-normal">
+                  {data.frames.length} frames · drop={summary.drop_frames} ·
+                  merge={summary.merge_frames}
+                </span>
+              </h2>
+              <p className="text-slate-500 text-xs mb-4">
+                Each dot = one frame &mdash; shows temporal distribution of
+                Normal, Drop, and Merge events
+              </p>
+              <div style={{ height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ScatterChart
+                    margin={{ top: 8, right: 24, bottom: 24, left: 12 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                    <XAxis
+                      dataKey="x"
+                      type="number"
+                      name="Frame"
+                      tick={{ fill: "#94a3b8", fontSize: 11 }}
+                      label={{
+                        value: "Frame #",
+                        position: "insideBottom",
+                        offset: -12,
+                        fill: "#64748b",
+                        fontSize: 11,
+                      }}
+                    />
+                    <YAxis
+                      dataKey="y"
+                      type="number"
+                      domain={[-0.5, 2.5]}
+                      ticks={[0, 1, 2]}
+                      tick={{ fill: "#94a3b8", fontSize: 11 }}
+                      tickFormatter={(v) =>
+                        ["Normal", "Drop", "Merge"][v] ?? ""
+                      }
+                      width={58}
+                    />
+                    <Tooltip
+                      cursor={{ strokeDasharray: "3 3", stroke: "#475569" }}
+                      contentStyle={{
+                        background: "#1e293b",
+                        border: "1px solid #334155",
+                        borderRadius: 8,
+                        color: "#f1f5f9",
+                        fontSize: 12,
+                      }}
+                      formatter={(val, name, props) => [
+                        `Frame ${props.payload.x}`,
+                        name,
+                      ]}
+                    />
+                    <Legend
+                      iconType="circle"
+                      iconSize={8}
+                      wrapperStyle={{ paddingTop: 4 }}
+                      formatter={(v) => (
+                        <span style={{ color: "#94a3b8", fontSize: 12 }}>
+                          {v}
+                        </span>
+                      )}
+                    />
+                    <Scatter
+                      name="Normal"
+                      data={timelineNormal}
+                      fill="#10b981"
+                      opacity={0.85}
+                    />
+                    <Scatter
+                      name="Drop"
+                      data={timelineDrop}
+                      fill="#ef4444"
+                      opacity={0.95}
+                    />
+                    <Scatter
+                      name="Merge"
+                      data={timelineMerge}
+                      fill="#f59e0b"
+                      opacity={0.85}
+                    />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* 2 — Motion Prediction Error Graph */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+              <h2 className="text-white font-semibold mb-1 flex items-center gap-2">
+                <span className="w-2 h-2 bg-red-400 rounded-full" />
+                Motion Prediction Error
+                <span className="ml-auto text-slate-500 text-xs font-normal">
+                  Kalman gate &mdash; threshold = {GATE_THRESHOLD} px
+                </span>
+              </h2>
+              <p className="text-slate-500 text-xs mb-4">
+                Distance (px) between Kalman-predicted ball position and
+                observed detection. Bars exceeding the red dashed line trigger a
+                DROP.
+              </p>
+              <div style={{ height: 240 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={motionData}
+                    margin={{ top: 8, right: 24, bottom: 24, left: 12 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#1e293b"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="frame"
+                      tick={{ fill: "#94a3b8", fontSize: 11 }}
+                      label={{
+                        value: "Frame #",
+                        position: "insideBottom",
+                        offset: -12,
+                        fill: "#64748b",
+                        fontSize: 11,
+                      }}
+                    />
+                    <YAxis
+                      tick={{ fill: "#94a3b8", fontSize: 11 }}
+                      label={{
+                        value: "Error (px)",
+                        angle: -90,
+                        position: "insideLeft",
+                        offset: 8,
+                        fill: "#64748b",
+                        fontSize: 11,
+                      }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "#1e293b",
+                        border: "1px solid #334155",
+                        borderRadius: 8,
+                        color: "#f1f5f9",
+                        fontSize: 12,
+                      }}
+                      formatter={(val, _name, props) => [
+                        `${val} px`,
+                        props.payload.label,
+                      ]}
+                      labelFormatter={(label) => `Frame ${label}`}
+                    />
+                    <ReferenceLine
+                      y={GATE_THRESHOLD}
+                      stroke="#ef4444"
+                      strokeDasharray="6 3"
+                      strokeWidth={2}
+                      label={{
+                        value: `Gate threshold: ${GATE_THRESHOLD} px`,
+                        position: "insideTopRight",
+                        fill: "#ef4444",
+                        fontSize: 11,
+                        fontWeight: 600,
+                      }}
+                    />
+                    <Bar dataKey="error" radius={[3, 3, 0, 0]} maxBarSize={20}>
+                      {motionData.map((entry, idx) => (
+                        <Cell
+                          key={idx}
+                          fill={
+                            entry.error > GATE_THRESHOLD
+                              ? "#ef4444"
+                              : entry.label === "MERGE"
+                                ? "#f59e0b"
+                                : "#3b82f6"
+                          }
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex flex-wrap gap-5 mt-3 justify-end">
+                {[
+                  ["#3b82f6", "Normal — within gate"],
+                  ["#f59e0b", "Merge Frame"],
+                  ["#ef4444", "Drop — gate exceeded"],
+                ].map(([color, label]) => (
+                  <div key={label} className="flex items-center gap-1.5">
+                    <span
+                      className="w-3 h-3 rounded-sm flex-shrink-0"
+                      style={{ background: color }}
+                    />
+                    <span className="text-slate-400 text-xs">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Drop / Merge Frame Lists ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -88,6 +88,7 @@ async def upload_video(file: UploadFile = File(...)):
         "report":          result["report"],
         "report_file":     result.get("report_file"),
         "csv_file":        result.get("csv_file"),
+        "thumbnail":       result.get("thumbnail"),
     }
 
 

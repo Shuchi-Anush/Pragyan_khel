@@ -58,7 +58,8 @@ function App() {
             navigate(
               `/results?video=${encodeURIComponent(result.annotated_video)}` +
                 `&report=${encodeURIComponent(result.report_file)}` +
-                `&csv=${encodeURIComponent(result.csv_file)}`,
+                `&csv=${encodeURIComponent(result.csv_file)}` +
+                `&thumbnail=${encodeURIComponent(result.thumbnail)}`,
             );
           } else {
             alert("Unexpected response: " + JSON.stringify(result));
