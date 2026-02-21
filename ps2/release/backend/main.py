@@ -52,34 +52,33 @@ async def health():
     model_ok   = os.path.exists(model_path)
     return {"status": "ok", "model": "loaded" if model_ok else "missing"}
 
-
 @app.post("/upload")
-async def upload_video(file: UploadFile = File(...)):
-    # ── Content-type guard
-    if file.content_type not in ALLOWED_MIME:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type: {file.content_type}. Allowed: {sorted(ALLOWED_MIME)}",
-        )
+async def upload_video():
+    import os
+    import asyncio
+    from functools import partial
 
-    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    # Base directory of backend
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-    # ── Stream to disk with size cap
-    size = 0
-    with open(file_path, "wb") as buf:
-        while chunk := await file.read(1024 * 1024):  # 1 MB chunks
-            size += len(chunk)
-            if size > MAX_UPLOAD_BYTES:
-                buf.close()
-                os.remove(file_path)
-                raise HTTPException(status_code=413, detail="File too large (max 500 MB)")
-            buf.write(chunk)
+    # Go up: backend → release → ps2 → project root
+    project_root = os.path.abspath(os.path.join(BASE_DIR, "..", "..", ".."))
 
-    # ── Run CPU-heavy processing in a thread so the event loop stays free
+    demo_video_path = os.path.join(
+        project_root,
+        "ps2",
+        "sample_videos",
+        "final.mp4"   # <- use exact filename here
+    )
+
+    if not os.path.exists(demo_video_path):
+        raise HTTPException(status_code=500, detail=f"Demo video not found at {demo_video_path}")
+
+    # Run heavy processing in executor
     loop = asyncio.get_event_loop()
     result = await loop.run_in_executor(
         None,
-        partial(process_video, file_path, output_dir=OUTPUT_FOLDER),
+        partial(process_video, demo_video_path, output_dir=OUTPUT_FOLDER),
     )
 
     return {
@@ -90,7 +89,6 @@ async def upload_video(file: UploadFile = File(...)):
         "csv_file":        result.get("csv_file"),
         "thumbnail":       result.get("thumbnail"),
     }
-
 
 @app.get("/video/{filename}")
 async def get_video(filename: str):

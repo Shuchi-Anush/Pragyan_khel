@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   PieChart,
@@ -34,7 +34,7 @@ function frameToTimestamp(frame, fps) {
 }
 
 /* ── PDF Report generator ────────────────────────────────────────────── */
-function generatePDF(data, videoFile) {
+function generatePDF(data) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const { summary } = data;
   const fps = data.fps || 25;
@@ -663,7 +663,6 @@ export default function Results() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
-  const videoRef = useRef(null);
 
   const videoFile = searchParams.get("video");
   const reportFile = searchParams.get("report");
@@ -752,13 +751,13 @@ export default function Results() {
     .map((f) => ({ x: f.frame, y: 2 }));
 
   // Motion error: GATE(Xpx) value if present, otherwise Euclidean centre delta
-  const motionData = (data.frames || []).map((f, i) => {
+  const motionData = (data.frames || []).map((f, frameIdx) => {
     const gateReason = f.reasons?.find((r) => r.startsWith("GATE("));
     let error = 0;
     if (gateReason) {
       error = parseInt(gateReason.match(/GATE\((\d+)px\)/)?.[1] || "0", 10);
-    } else if (i > 0) {
-      const prev = data.frames[i - 1];
+    } else if (frameIdx > 0) {
+      const prev = data.frames[frameIdx - 1];
       const dx = (f.center?.[0] ?? 0) - (prev.center?.[0] ?? 0);
       const dy = (f.center?.[1] ?? 0) - (prev.center?.[1] ?? 0);
       error = Math.round(Math.sqrt(dx * dx + dy * dy));
@@ -815,7 +814,7 @@ export default function Results() {
               // run in next tick so button state updates before heavy PDF work
               setTimeout(() => {
                 try {
-                  generatePDF(data, videoFile);
+                  generatePDF(data);
                 } finally {
                   setPdfLoading(false);
                 }
@@ -879,9 +878,9 @@ export default function Results() {
               Video Preview
             </h2>
             <div className="relative bg-black rounded-xl overflow-hidden">
-              <img 
-                src={`/download/${thumbnail}`} 
-                alt="First frame" 
+              <img
+                src={`/download/${thumbnail}`}
+                alt="First frame"
                 className="w-full rounded-xl"
                 style={{ maxHeight: "420px", objectFit: "contain" }}
               />
@@ -956,9 +955,7 @@ export default function Results() {
                 },
               ].map(({ label, value, color }) => (
                 <div key={label} className="flex items-center gap-2">
-                  <span
-                    className={`w-2 h-2 rounded-full flex-shrink-0 ${color}`}
-                  />
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${color}`} />
                   <span className="text-slate-400 text-xs flex-1">{label}</span>
                   <span className="text-white text-xs font-semibold">
                     {value}
@@ -1170,7 +1167,7 @@ export default function Results() {
                 ].map(([color, label]) => (
                   <div key={label} className="flex items-center gap-1.5">
                     <span
-                      className="w-3 h-3 rounded-sm flex-shrink-0"
+                      className="w-3 h-3 rounded-sm shrink-0"
                       style={{ background: color }}
                     />
                     <span className="text-slate-400 text-xs">{label}</span>
