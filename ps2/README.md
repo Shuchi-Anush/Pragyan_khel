@@ -1,23 +1,15 @@
-# PS2 - Frame Drop / Merge Detection System
+# PS2 — Frame Drop / Merge Detection Module
 
-## Objective
-Detect:
-- Frame Drops
-- Frame Merges
-- Scene Cuts
+This directory contains development and release components for Problem Statement 2.
 
-## Method
-Multi-signal fusion using:
-- Timestamp irregularity
-- Optical flow magnitude
-- SSIM similarity
-- Laplacian variance (blur detection)
-- Keypoint displacement tracking
+---
 
-## Output
-- Annotated video
-- Frame classification report
-- Confidence score per frame
-- Evaluation metrics
+## 📂 Structure
 
-## Run
+- **release/** → Final working hackathon demo build  
+- **scripts/** → Experimental and testing scripts used during development  
+- **core/** → Supporting algorithmic modules  
+
+Only the `release/` directory represents the finalized submission build.
+
+For setup and execution instructions, refer to the root `README.md`.
