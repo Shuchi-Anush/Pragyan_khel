@@ -6,7 +6,7 @@ ps2/scripts.zip
 venv/
 __pycache__/
 *.pyc
-ps2/sample_videos/
+# ps2/sample_videos/
 ps2/results/
 
 # Gradle files
